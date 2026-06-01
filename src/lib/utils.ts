@@ -117,7 +117,8 @@ export function calcFinance(
 ): FinanceSummary {
   const coursesCount = getCoursesCount(sessions);
   const billableSessions = TOTAL_SESSIONS * coursesCount;
-  const total = patient.session_price * billableSessions - patient.discount;
+  // الخصم يُطبّق على كل كورس على حدة
+  const total = (patient.session_price * TOTAL_SESSIONS - patient.discount) * coursesCount;
   const paid = payments.reduce((s, p) => s + Number(p.amount), 0);
   const remaining = Math.max(total - paid, 0);
   const perSession = total / billableSessions;
