@@ -12,7 +12,7 @@ export default async function PatientsPage() {
   const supabase = createServerSupabase();
   const { data } = await supabase
     .from("patients")
-    .select("id, name, phone, area, archived, days_system")
+    .select("id, name, phone, area, archived, days_system, default_time")
     .order("name");
 
   const patients = (data ?? []) as PatientListItem[];

@@ -14,6 +14,7 @@ export interface PatientListItem {
   area: string;
   archived: boolean;
   days_system: string;
+  default_time: string | null;
 }
 
 type SortBy = "name" | "area";
@@ -156,6 +157,18 @@ export function PatientsBrowser({ patients }: { patients: PatientListItem[] }) {
   );
 }
 
+function formatTime(time: string | null) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":");
+
+  const h = Number(hours);
+  const period = h >= 12 ? "م" : "ص";
+  const displayHour = h % 12 || 12;
+
+  return `${displayHour}:${minutes} ${period}`;
+}
+
 function PatientRow({ p }: { p: PatientListItem }) {
   return (
     <li>
@@ -164,7 +177,17 @@ function PatientRow({ p }: { p: PatientListItem }) {
         className="flex items-center gap-3 p-3 transition-colors hover:bg-accent/40"
       >
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{p.name}</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="truncate font-medium">
+              {p.name}
+            </div>
+
+            {formatTime(p.default_time) && (
+              <div className="text-xs text-muted-foreground whitespace-nowrap">
+               {formatTime(p.default_time)}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" />
             {p.area}
