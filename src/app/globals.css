@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 200 33% 98%;
+    --foreground: 215 28% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 20%;
+    --primary: 184 58% 35%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 195 25% 94%;
+    --secondary-foreground: 215 28% 25%;
+    --muted: 205 25% 95%;
+    --muted-foreground: 215 14% 47%;
+    --accent: 184 45% 93%;
+    --accent-foreground: 184 58% 28%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 50% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 92% 45%;
+    --warning-foreground: 0 0% 100%;
+    --border: 210 22% 89%;
+    --input: 210 22% 86%;
+    --ring: 184 58% 40%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* تحسين شكل الوقت/التاريخ في RTL */
+  input[type="date"],
+  input[type="time"] {
+    text-align: right;
+  }
+}
