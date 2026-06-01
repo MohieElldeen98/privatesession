@@ -68,6 +68,14 @@ export function PatientForm({
               <Label htmlFor="age">السن</Label>
               <Input id="age" name="age" type="number" inputMode="numeric" min="0" defaultValue={patient?.age ?? ""} placeholder="—" />
             </div>
+            <div>
+              <Label htmlFor="gender">النوع</Label>
+              <Select id="gender" name="gender" defaultValue={patient?.gender ?? ""}>
+                <option value="">—</option>
+                <option value="male">ذكر</option>
+                <option value="female">أنثى</option>
+              </Select>
+            </div>
           </div>
           <div>
             <Label htmlFor="area">المنطقة</Label>

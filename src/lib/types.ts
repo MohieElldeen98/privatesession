@@ -1,12 +1,19 @@
 export type DaysSystem = "sat_mon_wed" | "sun_tue_thu";
 export type PaymentMethod = "advance" | "per_session" | "every_3_sessions";
 export type SessionStatus = "done" | "pending" | "postponed" | "cancelled";
+export type Gender = "male" | "female";
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  male: "ذكر",
+  female: "أنثى",
+};
 
 export const TOTAL_SESSIONS = 12;
 
 export interface Patient {
   id: string;
   name: string;
+  gender: Gender | null;
   phone: string;
   area: string;
   street: string | null;

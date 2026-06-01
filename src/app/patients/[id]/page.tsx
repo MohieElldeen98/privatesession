@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase";
-import { Patient, PatientFile, Payment, Session } from "@/lib/types";
+import { Patient, PatientFile, Payment, Session, GENDER_LABELS } from "@/lib/types";
 import { calcFinance, getCoursesCount } from "@/lib/utils";
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,6 +95,12 @@ export default async function PatientPage({ params }: { params: { id: string } }
                 <span className="flex items-center gap-1">
                   <User className="h-4 w-4" />
                   {patient.age} سنة
+                </span>
+              )}
+              {patient.gender && (
+                <span className="flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  {GENDER_LABELS[patient.gender]}
                 </span>
               )}
               <span className="flex items-center gap-1" dir="ltr">

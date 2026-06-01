@@ -6,6 +6,7 @@ export const patientSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9+\s-]{7,15}$/, "رقم هاتف غير صحيح"),
+  gender: z.enum(["male", "female"]).optional(),
   area: z.string().trim().min(1, "المنطقة مطلوبة"),
   street: z.string().trim().optional().default(""),
   age: z.coerce.number().int().min(0).max(120).optional().or(z.literal("").transform(() => undefined)),

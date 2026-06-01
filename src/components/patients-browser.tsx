@@ -13,13 +13,16 @@ export interface PatientListItem {
   phone: string;
   area: string;
   archived: boolean;
+  days_system: string;
 }
 
 type SortBy = "name" | "area";
+type SystemFilter = "all" | "sat-mon-wed" | "sun-tue-thu";
 
 export function PatientsBrowser({ patients }: { patients: PatientListItem[] }) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("name");
+  const [systemFilter, setSystemFilter] = useState<SystemFilter>("all");
   const [showArchive, setShowArchive] = useState(false);
 
   const filtered = useMemo(() => {
@@ -30,13 +33,28 @@ export function PatientsBrowser({ patients }: { patients: PatientListItem[] }) {
       p.phone.includes(q) ||
       p.area.toLowerCase().includes(q);
 
+    const matchSystem = (p: PatientListItem) => {
+      if (systemFilter === "sat-mon-wed") {
+        return p.days_system === "sat_mon_wed";
+      }
+
+      if (systemFilter === "sun-tue-thu") {
+        return p.days_system === "sun_tue_thu";
+      }
+
+      return true;
+    };
     const sorter = (a: PatientListItem, b: PatientListItem) =>
       sortBy === "name"
         ? a.name.localeCompare(b.name, "ar")
-        : a.area.localeCompare(b.area, "ar") || a.name.localeCompare(b.name, "ar");
+        : a.area.localeCompare(b.area, "ar") || 
+          a.name.localeCompare(b.name, "ar");
 
-    return patients.filter(match).sort(sorter);
-  }, [patients, query, sortBy]);
+
+    return patients
+      .filter((p) => match(p) && matchSystem(p))
+      .sort(sorter);
+  }, [patients, query, sortBy, systemFilter]);
 
   const active = filtered.filter((p) => !p.archived);
   const archived = filtered.filter((p) => p.archived);
@@ -72,6 +90,38 @@ export function PatientsBrowser({ patients }: { patients: PatientListItem[] }) {
           حسب المنطقة
         </Button>
       </div>
+
+<div className="flex gap-2">
+  <Button
+    variant={systemFilter === "sat-mon-wed" ? "default" : "outline"}
+    size="sm"
+    onClick={() =>
+      setSystemFilter(
+        systemFilter === "sat-mon-wed"
+          ? "all"
+          : "sat-mon-wed"
+      )
+    }
+    className="flex-1"
+  >
+    سبت - اتنين - أربع
+  </Button>
+
+  <Button
+    variant={systemFilter === "sun-tue-thu" ? "default" : "outline"}
+    size="sm"
+    onClick={() =>
+      setSystemFilter(
+        systemFilter === "sun-tue-thu"
+          ? "all"
+          : "sun-tue-thu"
+      )
+    }    
+    className="flex-1"
+  >
+    حد - تلات - خميس
+  </Button>
+</div>
 
       {active.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">لا يوجد مرضى نشطون</p>
