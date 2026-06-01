@@ -28,7 +28,13 @@ export function toISODate(d: Date): string {
 }
 
 export function todayISO(): string {
-  return toISODate(new Date());
+  const cairoDate = new Date(
+    new Date().toLocaleString("en-US", {
+      timeZone: "Africa/Cairo",
+    })
+  );
+
+  return toISODate(cairoDate);
 }
 
 // توليد تواريخ 12 جلسة بدءًا من تاريخ البداية حسب نظام الأيام
