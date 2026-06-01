@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CallButton, WhatsAppButton } from "@/components/contact-buttons";
+import { LogoutButton } from "@/components/logout-button";
 import { Plus, Users, CalendarClock, Wallet, FileText, MapPin } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -48,11 +49,14 @@ export default async function HomePage() {
       <AppHeader
         title="جلسات اليوم"
         action={
-          <Button asChild size="sm">
-            <Link href="/patients/new">
-              <Plus /> مريض
-            </Link>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button asChild size="sm">
+              <Link href="/patients/new">
+                <Plus /> مريض
+              </Link>
+            </Button>
+            <LogoutButton />
+          </div>
         }
       />
 
