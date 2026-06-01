@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Session, SESSION_STATUS_LABELS, SessionStatus } from "@/lib/types";
 import { updateSession, bulkUpdateStatus } from "@/app/actions/sessions";
-import { formatArabicDate, formatTime } from "@/lib/utils";
+import { deleteCourse, rescheduleCourse } from "@/app/actions/patients";
+import { formatArabicDate, formatTime, todayISO } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronDown, CheckSquare, Square, X } from "lucide-react";
+import { ChevronLeft, ChevronDown, CheckSquare, Square, X, Pencil, Trash2 } from "lucide-react";
 
 const STATUSES: SessionStatus[] = ["done", "pending", "postponed", "cancelled"];
 
@@ -41,6 +42,30 @@ export function SessionsTable({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<SessionStatus>("done");
+
+  // تعديل/حذف كورس
+  const [editCourse, setEditCourse] = useState<number | null>(null);
+  const [delCourse, setDelCourse] = useState<number | null>(null);
+  const [reDate, setReDate] = useState(todayISO());
+  const [reTime, setReTime] = useState("");
+
+  function doReschedule() {
+    if (editCourse == null) return;
+    startTransition(async () => {
+      await rescheduleCourse(patientId, editCourse, reDate, reTime || undefined);
+      setEditCourse(null);
+      router.refresh();
+    });
+  }
+
+  function doDeleteCourse() {
+    if (delCourse == null) return;
+    startTransition(async () => {
+      await deleteCourse(patientId, delCourse);
+      setDelCourse(null);
+      router.refresh();
+    });
+  }
 
   function toggleCourse(n: number) {
     setOpenCourses((prev) => {
@@ -118,29 +143,44 @@ export function SessionsTable({
           const cumulative = 12 * courseNum;
           return (
             <div key={courseNum} className="overflow-hidden rounded-xl border bg-card">
-              <button
-                onClick={() => toggleCourse(courseNum)}
-                className="flex w-full items-center gap-2 p-3 text-right"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">كورس رقم {courseNum}</span>
-                    <span
-                      className={
-                        finished ? "text-xs font-medium text-success" : "text-xs font-medium text-primary"
-                      }
-                    >
-                      {finished ? "انتهى" : `${done}/12 تمت`}
-                    </span>
+              <div className="flex items-center gap-1 p-3">
+                <button onClick={() => toggleCourse(courseNum)} className="flex flex-1 items-center gap-2 text-right">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">كورس رقم {courseNum}</span>
+                      <span
+                        className={
+                          finished ? "text-xs font-medium text-success" : "text-xs font-medium text-primary"
+                        }
+                      >
+                        {finished ? "انتهى" : `${done}/12 تمت`}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">إجمالي {cumulative} جلسة</span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground">إجمالي {cumulative} جلسة</span>
-                </div>
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
+                </button>
+                <button
+                  onClick={() => { setReDate(courseSessions[0]?.session_date ?? todayISO()); setReTime(""); setEditCourse(courseNum); }}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                  aria-label="تعديل مواعيد الكورس"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setDelCourse(courseNum)}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-accent"
+                  aria-label="حذف الكورس"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <button onClick={() => toggleCourse(courseNum)} className="flex h-8 w-8 items-center justify-center" aria-label="فتح/طي">
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
 
               {isOpen && (
                 <ul className="divide-y border-t">
@@ -202,6 +242,51 @@ export function SessionsTable({
           </div>
         </div>
       )}
+
+      {/* تعديل مواعيد كورس */}
+      <Dialog open={editCourse != null} onOpenChange={(o) => !o && setEditCourse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>تعديل مواعيد كورس رقم {editCourse}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              هيتم إعادة توزيع تواريخ جلسات الكورس بدءًا من التاريخ ده على نفس نظام الأيام، مع الحفاظ على حالة كل جلسة.
+            </p>
+            <div>
+              <Label htmlFor="re-date">تاريخ أول جلسة</Label>
+              <Input id="re-date" type="date" value={reDate} onChange={(e) => setReDate(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="re-time">الميعاد (اختياري)</Label>
+              <Input id="re-time" type="time" value={reTime} onChange={(e) => setReTime(e.target.value)} />
+            </div>
+            <Button className="w-full" disabled={isPending || !reDate} onClick={doReschedule}>
+              {isPending ? "جارٍ الحفظ..." : "حفظ المواعيد"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* حذف كورس */}
+      <Dialog open={delCourse != null} onOpenChange={(o) => !o && setDelCourse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف كورس رقم {delCourse}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            هيتم حذف كل جلسات الكورس ده نهائيًا، وباقي الكورسات هيُعاد ترقيمها. لا يمكن التراجع.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="destructive" className="flex-1" disabled={isPending} onClick={doDeleteCourse}>
+              {isPending ? "جارٍ الحذف..." : "نعم، احذف الكورس"}
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setDelCourse(null)}>
+              إلغاء
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
         <DialogContent>

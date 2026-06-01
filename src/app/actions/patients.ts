@@ -172,6 +172,104 @@ export async function renewCourse(
   }));
 
   await supabase.from("sessions").insert(rows);
+  // إعادة ترقيم الكورسات حسب التاريخ (الأقدم = كورس 1)
+  await renumberCourses(supabase, patientId);
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  revalidatePath("/calc");
+}
+
+// إعادة ترقيم كل كورسات المريض بترتيب أقدم تاريخ جلسة (يصبح كورس 1، 2، 3 ...)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function renumberCourses(supabase: any, patientId: string) {
+  const { data } = await supabase
+    .from("sessions")
+    .select("course_number, session_date")
+    .eq("patient_id", patientId);
+  const rows = (data ?? []) as Pick<Session, "course_number" | "session_date">[];
+  if (rows.length === 0) return;
+
+  // أقدم تاريخ لكل كورس
+  const minDate = new Map<number, string>();
+  for (const r of rows) {
+    const cur = minDate.get(r.course_number);
+    if (!cur || r.session_date < cur) minDate.set(r.course_number, r.session_date);
+  }
+  // ترتيب أرقام الكورسات الحالية حسب أقدم تاريخ
+  const ordered = Array.from(minDate.entries())
+    .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+    .map(([num]) => num);
+
+  // لو الترتيب صحيح بالفعل لا تفعل شيئًا
+  const alreadyOk = ordered.every((num, i) => num === i + 1);
+  if (alreadyOk) return;
+
+  // مرحلتان لتفادي تعارض قيد التفرّد: إزاحة مؤقتة ثم الأرقام النهائية
+  for (let i = 0; i < ordered.length; i++) {
+    await supabase
+      .from("sessions")
+      .update({ course_number: 1000 + i })
+      .eq("patient_id", patientId)
+      .eq("course_number", ordered[i]);
+  }
+  for (let i = 0; i < ordered.length; i++) {
+    await supabase
+      .from("sessions")
+      .update({ course_number: i + 1 })
+      .eq("patient_id", patientId)
+      .eq("course_number", 1000 + i);
+  }
+}
+
+// حذف كورس كامل (كل جلساته) ثم إعادة الترقيم
+export async function deleteCourse(patientId: string, courseNumber: number) {
+  const supabase = createServerSupabase();
+  await supabase
+    .from("sessions")
+    .delete()
+    .eq("patient_id", patientId)
+    .eq("course_number", courseNumber);
+  await renumberCourses(supabase, patientId);
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  revalidatePath("/calc");
+}
+
+// تعديل مواعيد كورس: إعادة توزيع تواريخ جلساته بدءًا من تاريخ جديد (مع الحفاظ على الحالات والملاحظات)
+export async function rescheduleCourse(
+  patientId: string,
+  courseNumber: number,
+  startDate: string,
+  startTime?: string
+) {
+  const supabase = createServerSupabase();
+  const { data: patient } = await supabase
+    .from("patients")
+    .select("days_system, default_time")
+    .eq("id", patientId)
+    .single();
+  if (!patient) return;
+
+  const { data } = await supabase
+    .from("sessions")
+    .select("id, session_number")
+    .eq("patient_id", patientId)
+    .eq("course_number", courseNumber)
+    .order("session_number");
+  const rows = (data ?? []) as Pick<Session, "id" | "session_number">[];
+  if (rows.length === 0) return;
+
+  const dates = generateSessionDates(startDate, patient.days_system, rows.length);
+  const time = startTime || null;
+  for (let i = 0; i < rows.length; i++) {
+    const patch: { session_date: string; session_time?: string | null } = {
+      session_date: dates[i],
+    };
+    if (startTime) patch.session_time = time;
+    await supabase.from("sessions").update(patch).eq("id", rows[i].id);
+  }
+  // التواريخ تغيّرت فقد يتغيّر الترتيب الزمني بين الكورسات
+  await renumberCourses(supabase, patientId);
   revalidatePath(`/patients/${patientId}`);
   revalidatePath("/");
   revalidatePath("/calc");
