@@ -148,6 +148,19 @@ export async function bulkUpdateStatus(
   return { ok: true };
 }
 
+// حذف دفعة (للتراجع عن دفعة مسجلة بالخطأ)
+export async function deletePayment(
+  patientId: string,
+  paymentId: string
+): Promise<ActionResult> {
+  const supabase = createServerSupabase();
+  const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // تسجيل دفعة بضغطة واحدة (لأزرار التحصيل السريعة)
 export async function quickPay(
   patientId: string,
