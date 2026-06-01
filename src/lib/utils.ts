@@ -71,7 +71,8 @@ export function formatArabicDate(iso: string): string {
   const dayName = AR_DAYS[d.getDay()];
   const day = d.getDate();
   const month = d.getMonth() + 1;
-  return `${dayName} ${day}/${month}`;
+  const year = d.getFullYear();
+  return `${dayName} ${day}/${month}/${year}`;
 }
 
 export function formatTime(time: string | null): string {
