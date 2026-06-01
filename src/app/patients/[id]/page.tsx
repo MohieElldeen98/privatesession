@@ -73,7 +73,7 @@ export default async function PatientPage({ params }: { params: { id: string } }
     patient.past_history ||
     patient.symptoms?.length ||
     patient.operations?.length ||
-    patient.treatment_program?.length;
+    patient.treatment_program?.length
   );
 
   return (
