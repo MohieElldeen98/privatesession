@@ -110,8 +110,9 @@ export function FinanceCard({
                 : "12"
             }
           />
-          <Row label="الخصم" value={`${formatMoney(patient.discount)} ج`} />
-          <Row label="الإجمالي المستحق" value={`${formatMoney(finance.total)} ج`} strong />
+          <Row label="الإجمالي قبل الخصم" value={`${formatMoney(finance.totalBeforeDiscount)} ج`} />
+          <Row label="الخصم" value={`${formatMoney(finance.discountApplied)} ج`} />
+          <Row label="الإجمالي بعد الخصم" value={`${formatMoney(finance.total)} ج`} strong />
           <Row label="المدفوع" value={`${formatMoney(finance.paid)} ج`} />
           <Row label="المتبقي" value={`${formatMoney(finance.remaining)} ج`} strong />
         </div>

@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChecklistField } from "@/components/checklist-field";
+import { PricingFields } from "@/components/pricing-fields";
 import { todayISO } from "@/lib/utils";
 import {
   DAYS_SYSTEM_LABELS,
@@ -116,14 +117,7 @@ export function PatientForm({
       <Card>
         <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="session_price">سعر الجلسة</Label>
-              <Input id="session_price" name="session_price" type="number" inputMode="numeric" min="0" required defaultValue={patient?.session_price ?? ""} placeholder="0" />
-            </div>
-            <div>
-              <Label htmlFor="discount">الخصم (إجمالي)</Label>
-              <Input id="discount" name="discount" type="number" inputMode="numeric" min="0" defaultValue={patient?.discount ?? 0} />
-            </div>
+            <PricingFields defaultPrice={patient?.session_price} defaultDiscount={patient?.discount ?? 0} />
           </div>
           <div>
             <Label htmlFor="payment_method">طريقة الدفع</Label>

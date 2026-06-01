@@ -93,6 +93,8 @@ export function formatMoney(n: number): string {
 // ---------- الحسابات المالية ----------
 export interface FinanceSummary {
   total: number; // إجمالي المستحق بعد الخصم (لكل الكورسات)
+  totalBeforeDiscount: number; // الإجمالي قبل الخصم
+  discountApplied: number; // إجمالي الخصم المطبّق (الخصم × عدد الكورسات)
   paid: number; // المدفوع
   remaining: number; // المتبقي
   perSession: number; // سعر الجلسة الفعلي بعد توزيع الخصم
@@ -118,7 +120,9 @@ export function calcFinance(
   const coursesCount = getCoursesCount(sessions);
   const billableSessions = TOTAL_SESSIONS * coursesCount;
   // الخصم يُطبّق على كل كورس على حدة
-  const total = (patient.session_price * TOTAL_SESSIONS - patient.discount) * coursesCount;
+  const totalBeforeDiscount = patient.session_price * billableSessions;
+  const discountApplied = patient.discount * coursesCount;
+  const total = totalBeforeDiscount - discountApplied;
   const paid = payments.reduce((s, p) => s + Number(p.amount), 0);
   const remaining = Math.max(total - paid, 0);
   const perSession = total / billableSessions;
@@ -137,6 +141,8 @@ export function calcFinance(
 
   return {
     total,
+    totalBeforeDiscount,
+    discountApplied,
     paid,
     remaining,
     perSession,
