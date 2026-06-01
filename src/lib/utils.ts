@@ -91,7 +91,7 @@ export function formatTime(time: string | null): string {
 }
 
 export function formatMoney(n: number): string {
-  return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
     Math.round(n)
   );
 }
