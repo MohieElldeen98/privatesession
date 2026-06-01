@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, AlertTriangle, CheckCircle2, Trash2, Pencil } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle2, Trash2, Pencil, ChevronDown, ChevronLeft } from "lucide-react";
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -37,7 +37,12 @@ export function FinanceCard({
   payments: Payment[];
   sessions: Session[];
 }) {
+  const initMaxPayCourse = payments.length
+    ? Math.max(...payments.map((p) => courseForDate(sessions, p.payment_date)))
+    : 1;
+
   const [open, setOpen] = useState(false);
+  const [openPay, setOpenPay] = useState<Set<number>>(new Set([initMaxPayCourse]));
   const [confirmQuick, setConfirmQuick] = useState(false);
   const [deleting, setDeleting] = useState<Payment | null>(null);
   const [editing, setEditing] = useState<Payment | null>(null);
@@ -127,6 +132,23 @@ export function FinanceCard({
     });
   }
 
+  function togglePayCourse(n: number) {
+    setOpenPay((prev) => {
+      const next = new Set(prev);
+      next.has(n) ? next.delete(n) : next.add(n);
+      return next;
+    });
+  }
+
+  // تجميع الدفعات حسب الكورس (من تاريخ كل دفعة)
+  const payGroups = new Map<number, Payment[]>();
+  for (const p of sortedPayments) {
+    const c = courseForDate(sessions, p.payment_date);
+    if (!payGroups.has(c)) payGroups.set(c, []);
+    payGroups.get(c)!.push(p);
+  }
+  const payCourseNums = Array.from(payGroups.keys()).sort((a, b) => a - b);
+
   const quickLabel =
     patient.payment_method === "advance"
       ? "تحصيل المقدم بالكامل"
@@ -197,38 +219,64 @@ export function FinanceCard({
         </Button>
         {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
 
-        {/* سجل الدفعات */}
+        {/* سجل الدفعات مجمّعًا حسب الكورس */}
         {sortedPayments.length > 0 && (
-          <div className="mt-4">
-            <h3 className="mb-1.5 text-sm font-semibold text-muted-foreground">الدفعات المسجلة</h3>
-            <ul className="divide-y rounded-lg border">
-              {sortedPayments.map((p) => (
-                <li key={p.id} className="flex items-center gap-2 p-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{formatMoney(Number(p.amount))} ج</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatArabicDate(p.payment_date)}
-                      {p.note ? ` · ${p.note}` : ""}
-                      {` · كورس ${courseForDate(sessions, p.payment_date)}`}
+          <div className="mt-4 space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">الدفعات المسجلة</h3>
+            {payCourseNums.map((courseNum) => {
+              const list = payGroups.get(courseNum)!;
+              const sum = list.reduce((s, p) => s + Number(p.amount), 0);
+              const isOpen = openPay.has(courseNum);
+              return (
+                <div key={courseNum} className="overflow-hidden rounded-lg border">
+                  <button
+                    onClick={() => togglePayCourse(courseNum)}
+                    className="flex w-full items-center gap-2 bg-secondary/50 p-2.5 text-right"
+                  >
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">دفعات كورس {courseNum}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {list.length} دفعة · {formatMoney(sum)} ج
+                      </span>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => openEdit(p)}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-                    aria-label="تعديل الدفعة"
-                  >
-                    <Pencil className="h-4 w-4" />
+                    {isOpen ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </button>
-                  <button
-                    onClick={() => setDeleting(p)}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-accent"
-                    aria-label="حذف الدفعة"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
+                  {isOpen && (
+                    <ul className="divide-y border-t">
+                      {list.map((p) => (
+                        <li key={p.id} className="flex items-center gap-2 p-2.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium">{formatMoney(Number(p.amount))} ج</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatArabicDate(p.payment_date)}
+                              {p.note ? ` · ${p.note}` : ""}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => openEdit(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                            aria-label="تعديل الدفعة"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleting(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-accent"
+                            aria-label="حذف الدفعة"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
