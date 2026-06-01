@@ -67,13 +67,14 @@ export default async function PatientPage({ params }: { params: { id: string } }
     f.signed_url = signed?.signedUrl;
   }
 
-  const hasMedical =
+  const hasMedical = Boolean(
     patient.diagnosis ||
     patient.present_history ||
     patient.past_history ||
     patient.symptoms?.length ||
     patient.operations?.length ||
     patient.treatment_program?.length;
+  );
 
   return (
     <div className="pb-10">
