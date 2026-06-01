@@ -112,6 +112,31 @@ export function getCoursesCount(sessions: Session[]): number {
   return Math.max(...sessions.map((s) => s.course_number ?? 1));
 }
 
+// تاريخ بداية كل كورس
+export function courseStartDates(sessions: Session[]): Map<number, string> {
+  const m = new Map<number, string>();
+  for (const s of sessions) {
+    const cur = m.get(s.course_number);
+    if (!cur || s.session_date < cur) m.set(s.course_number, s.session_date);
+  }
+  return m;
+}
+
+// تحديد الكورس الذي تتبعه دفعة بناءً على تاريخها:
+// الكورس صاحب أحدث تاريخ بداية أقل من أو يساوي تاريخ الدفعة
+export function courseForDate(sessions: Session[], dateISO: string): number {
+  const starts = Array.from(courseStartDates(sessions).entries()).sort((a, b) =>
+    a[1] < b[1] ? -1 : 1
+  );
+  if (starts.length === 0) return 1;
+  let result = starts[0][0];
+  for (const [num, start] of starts) {
+    if (start <= dateISO) result = num;
+    else break;
+  }
+  return result;
+}
+
 export function calcFinance(
   patient: Patient,
   sessions: Session[],

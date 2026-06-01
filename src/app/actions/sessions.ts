@@ -148,6 +148,27 @@ export async function bulkUpdateStatus(
   return { ok: true };
 }
 
+// تعديل دفعة مسجّلة (المبلغ/التاريخ/الملاحظة)
+export async function updatePayment(
+  patientId: string,
+  paymentId: string,
+  amount: number,
+  paymentDate: string,
+  note: string
+): Promise<ActionResult> {
+  if (!(amount > 0)) return { ok: false, error: "مبلغ غير صحيح" };
+  if (!paymentDate) return { ok: false, error: "التاريخ مطلوب" };
+  const supabase = createServerSupabase();
+  const { error } = await supabase
+    .from("payments")
+    .update({ amount, payment_date: paymentDate, note: note || null })
+    .eq("id", paymentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // حذف دفعة (للتراجع عن دفعة مسجلة بالخطأ)
 export async function deletePayment(
   patientId: string,

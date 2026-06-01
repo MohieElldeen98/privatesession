@@ -127,7 +127,7 @@ export default async function PatientPage({ params }: { params: { id: string } }
         <FileManager patientId={patient.id} files={files} />
 
         {/* الحالة المالية */}
-        <FinanceCard patient={patient} finance={finance} payments={payments} />
+        <FinanceCard patient={patient} finance={finance} payments={payments} sessions={sessions} />
 
         {/* الجلسات */}
         <SessionsTable sessions={sessions} patientId={patient.id} />

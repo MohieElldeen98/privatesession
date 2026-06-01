@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createPayment, quickPay, deletePayment } from "@/app/actions/sessions";
-import { FinanceSummary, formatMoney, formatArabicDate, todayISO } from "@/lib/utils";
-import { Patient, Payment, PAYMENT_METHOD_LABELS } from "@/lib/types";
+import { createPayment, quickPay, deletePayment, updatePayment } from "@/app/actions/sessions";
+import { FinanceSummary, formatMoney, formatArabicDate, todayISO, courseForDate } from "@/lib/utils";
+import { Patient, Payment, Session, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, AlertTriangle, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle2, Trash2, Pencil } from "lucide-react";
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -30,14 +30,20 @@ export function FinanceCard({
   patient,
   finance,
   payments,
+  sessions,
 }: {
   patient: Patient;
   finance: FinanceSummary;
   payments: Payment[];
+  sessions: Session[];
 }) {
   const [open, setOpen] = useState(false);
   const [confirmQuick, setConfirmQuick] = useState(false);
   const [deleting, setDeleting] = useState<Payment | null>(null);
+  const [editing, setEditing] = useState<Payment | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editNote, setEditNote] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -87,6 +93,33 @@ export function FinanceCard({
       const res = await deletePayment(patient.id, deleting.id);
       if (res.ok) {
         setDeleting(null);
+        router.refresh();
+      } else {
+        setError(res.error ?? "حدث خطأ");
+      }
+    });
+  }
+
+  function openEdit(p: Payment) {
+    setError(null);
+    setEditAmount(String(Number(p.amount)));
+    setEditDate(p.payment_date);
+    setEditNote(p.note ?? "");
+    setEditing(p);
+  }
+
+  function doEdit() {
+    if (!editing) return;
+    startTransition(async () => {
+      const res = await updatePayment(
+        patient.id,
+        editing.id,
+        Number(editAmount || 0),
+        editDate,
+        editNote
+      );
+      if (res.ok) {
+        setEditing(null);
         router.refresh();
       } else {
         setError(res.error ?? "حدث خطأ");
@@ -176,8 +209,16 @@ export function FinanceCard({
                     <div className="text-xs text-muted-foreground">
                       {formatArabicDate(p.payment_date)}
                       {p.note ? ` · ${p.note}` : ""}
+                      {` · كورس ${courseForDate(sessions, p.payment_date)}`}
                     </div>
                   </div>
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                    aria-label="تعديل الدفعة"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={() => setDeleting(p)}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-accent"
@@ -240,6 +281,38 @@ export function FinanceCard({
             </Button>
             <Button variant="outline" className="flex-1" onClick={() => setDeleting(null)}>
               إلغاء
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* تعديل دفعة */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>تعديل الدفعة</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="edit-amount">المبلغ (ج)</Label>
+              <Input id="edit-amount" type="number" inputMode="numeric" min="1" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-date">تاريخ الدفعة</Label>
+              <Input id="edit-date" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+              {editDate && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  هتتحسب على: كورس {courseForDate(sessions, editDate)}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-note">الملاحظة</Label>
+              <Input id="edit-note" value={editNote} onChange={(e) => setEditNote(e.target.value)} placeholder="اختياري" />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button className="w-full" size="lg" disabled={isPending || !editDate} onClick={doEdit}>
+              {isPending ? "جارٍ الحفظ..." : "حفظ التعديل"}
             </Button>
           </div>
         </DialogContent>
