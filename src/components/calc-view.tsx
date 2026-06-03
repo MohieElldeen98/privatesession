@@ -65,14 +65,14 @@ export function CalcView({
   const range: [string, string] =
     preset === "week" ? [wStart, wEnd] : preset === "month" ? [mStart, mEnd] : [from, to];
 
+  // الجلسات الجاية في الفترة (لم تتم بعد) — اللي متوقع نحصّل مقابلها
   const inRange = useMemo(
     () =>
       sessions.filter(
         (s) =>
           s.session_date >= range[0] &&
           s.session_date <= range[1] &&
-          s.status !== "cancelled" &&
-          s.status !== "postponed"
+          s.status === "pending"
       ),
     [sessions, range]
   );
@@ -114,7 +114,7 @@ export function CalcView({
       {/* إيرادات الفترة */}
       <div>
         <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-muted-foreground">
-          <CalendarRange className="h-4 w-4" /> إيرادات الفترة
+          <CalendarRange className="h-4 w-4" /> المتوقع تحصيله في الفترة
         </h2>
 
         <div className="mb-3 flex gap-2">
@@ -139,9 +139,9 @@ export function CalcView({
         <Card>
           <CardContent className="pt-4">
             <div className="text-3xl font-bold text-primary">{formatMoney(total)} ج</div>
-            <div className="text-xs text-muted-foreground">{inRange.length} جلسة في الفترة المحددة</div>
+            <div className="text-xs text-muted-foreground">{inRange.length} جلسة جاية في الفترة</div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              محسوب بسعر الجلسة بعد الخصم، لكل الجلسات الفعلية بغضّ النظر عن طريقة الدفع أو التحصيل.
+              الفلوس المتوقع تحصيلها من الجلسات الجاية (اللي لسه ما تمتش) بسعر الجلسة بعد الخصم — بدون اللي دفعوا مقدم.
             </p>
           </CardContent>
         </Card>

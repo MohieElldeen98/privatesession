@@ -16,7 +16,7 @@ export default async function CalcPage() {
   const supabase = createServerSupabase();
 
   const [{ data: patients }, { data: sessions }] = await Promise.all([
-    supabase.from("patients").select("id, name, session_price, discount, archived"),
+    supabase.from("patients").select("id, name, session_price, discount, payment_method, archived"),
     supabase.from("sessions").select("patient_id, session_date, status"),
   ]);
 
@@ -24,20 +24,28 @@ export default async function CalcPage() {
   const effMap = new Map(allPatients.map((p) => [p.id, effectivePrice(p)]));
   const nameMap = new Map(allPatients.map((p) => [p.id, p.name]));
 
+  // حاسبة المرضى تحت تشمل كل المرضى النشطين
   const calcPatients: CalcPatient[] = allPatients
     .filter((p) => !p.archived)
     .map((p) => ({ id: p.id, name: p.name, price: effMap.get(p.id) ?? 0 }))
     .sort((a, b) => a.name.localeCompare(b.name, "ar"));
 
+  // إيرادات الفترة: نستبعد المؤرشفين واللي بيدفعوا مقدم تمامًا
+  const collectibleIds = new Set(
+    allPatients.filter((p) => !p.archived && p.payment_method !== "advance").map((p) => p.id)
+  );
+
   const calcSessions: CalcSession[] = ((sessions ?? []) as Pick<
     Session,
     "patient_id" | "session_date" | "status"
-  >[]).map((s) => ({
-    patient_id: s.patient_id,
-    session_date: s.session_date,
-    status: s.status,
-    price: effMap.get(s.patient_id) ?? 0,
-  }));
+  >[])
+    .filter((s) => collectibleIds.has(s.patient_id))
+    .map((s) => ({
+      patient_id: s.patient_id,
+      session_date: s.session_date,
+      status: s.status,
+      price: effMap.get(s.patient_id) ?? 0,
+    }));
 
   return (
     <div className="pb-20">
