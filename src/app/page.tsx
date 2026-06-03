@@ -6,9 +6,9 @@ import { AppHeader } from "@/components/app-header";
 import { BottomNav } from "@/components/bottom-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CallButton, WhatsAppButton } from "@/components/contact-buttons";
+import { TodaySessionActions } from "@/components/today-session-actions";
 import { LogoutButton } from "@/components/logout-button";
-import { Plus, Users, CalendarClock, Wallet, FileText, MapPin } from "lucide-react";
+import { Plus, Users, CalendarClock, Wallet, MapPin } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -26,18 +26,53 @@ export default async function HomePage() {
   const allSessions = (sessions ?? []) as Session[];
   const allPayments = (payments ?? []) as Payment[];
 
-  // إجمالي المستحقات غير المحصلة (مجموع المتبقي للمرضى النشطين)
-  let totalRemaining = 0;
+  // الحالة المالية لكل مريض
+  const financeByPatient = new Map<string, ReturnType<typeof calcFinance>>();
   for (const p of activePatients) {
     const ps = allSessions.filter((s) => s.patient_id === p.id);
     const pp = allPayments.filter((pay) => pay.patient_id === p.id);
-    totalRemaining += calcFinance(p, ps, pp).remaining;
+    financeByPatient.set(p.id, calcFinance(p, ps, pp));
+  }
+  const totalRemaining = activePatients.reduce(
+    (sum, p) => sum + (financeByPatient.get(p.id)?.remaining ?? 0),
+    0
+  );
+  const paidTodayByPatient = new Set(
+    allPayments.filter((x) => x.payment_date === today).map((x) => x.patient_id)
+  );
+
+  // المبلغ المقترح وإتاحة زر الدفع حسب نظام الدفع
+  function payInfo(p: Patient) {
+    const fin = financeByPatient.get(p.id)!;
+    if (p.payment_method === "advance")
+      return { amount: fin.remaining, note: "تحصيل المقدم", canPay: fin.remaining > 0 };
+    if (p.payment_method === "every_3_sessions")
+      return { amount: fin.dueNow, note: "تحصيل مستحق", canPay: fin.dueNow > 0 };
+    return {
+      amount: Math.round(fin.perSession),
+      note: "دفعة جلسة",
+      canPay: !paidTodayByPatient.has(p.id) && fin.remaining > 0,
+    };
   }
 
   // جلسات اليوم
+// هل تمت تسوية المريض اليوم (أخذ الجلسة + دفع حسب نظامه)؟
+  function isSettledToday(p: Patient, s: Session): boolean {
+    if (s.status !== "done") return false;
+    const ps = allSessions.filter((x) => x.patient_id === p.id);
+    const pp = allPayments.filter((x) => x.patient_id === p.id);
+    const fin = calcFinance(p, ps, pp);
+    if (p.payment_method === "advance") return fin.remaining === 0;
+    if (p.payment_method === "every_3_sessions") return fin.dueNow === 0;
+    // جلسة بجلسة: لازم تكون فيه دفعة بتاريخ النهاردة
+    return pp.some((x) => x.payment_date === today);
+  }
+
+  // جلسات اليوم (نشيل اللي اتسوّت بالكامل: تمت + دُفعت حسب نظامها)
   const patientMap = new Map(activePatients.map((p) => [p.id, p]));
   const todaySessions: TodaySession[] = allSessions
     .filter((s) => s.session_date === today && patientMap.has(s.patient_id))
+    .filter((s) => !isSettledToday(patientMap.get(s.patient_id)!, s))
     .map((s) => {
       const p = patientMap.get(s.patient_id)!;
       return { ...s, patient_name: p.name, patient_area: p.area, patient_phone: p.phone };
@@ -84,31 +119,33 @@ export default async function HomePage() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {todaySessions.map((s) => (
-                <Card key={s.id}>
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <div className="flex w-14 shrink-0 flex-col items-center">
-                      <span className="text-sm font-bold text-primary">{formatTime(s.session_time)}</span>
-                    </div>
-                    <div className="min-w-0 flex-1 border-r pr-3">
-                      <div className="truncate font-medium">{s.patient_name}</div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {s.patient_area}
+              {todaySessions.map((s) => {
+                const pi = payInfo(patientMap.get(s.patient_id)!);
+                return (
+                  <Card key={s.id}>
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <div className="flex w-14 shrink-0 flex-col items-center">
+                        <span className="text-sm font-bold text-primary">{formatTime(s.session_time)}</span>
                       </div>
-                    </div>
-                    <div className="flex shrink-0 gap-1.5">
-                      <CallButton phone={s.patient_phone} />
-                      <WhatsAppButton phone={s.patient_phone} />
-                      <Button asChild variant="outline" size="icon" aria-label="ملف المريض">
-                        <Link href={`/patients/${s.patient_id}`}>
-                          <FileText />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      <div className="min-w-0 flex-1 border-r pr-3">
+                        <div className="truncate font-medium">{s.patient_name}</div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          {s.patient_area}
+                        </div>
+                      </div>
+                      <TodaySessionActions
+                        sessionId={s.id}
+                        patientId={s.patient_id}
+                        isDone={s.status === "done"}
+                        payAmount={pi.amount}
+                        payNote={pi.note}
+                        canPay={pi.canPay}
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
