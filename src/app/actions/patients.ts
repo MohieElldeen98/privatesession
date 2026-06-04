@@ -16,7 +16,6 @@ function parsePatientForm(formData: FormData) {
     area: formData.get("area"),
     street: formData.get("street") || "",
     age: formData.get("age") || "",
-    gender: formData.get("gender") || undefined,
     course_start_date: formData.get("course_start_date"),
     days_system: formData.get("days_system"),
     session_price: formData.get("session_price"),
@@ -41,7 +40,6 @@ function patientRecord(data: any) {
     area: data.area,
     street: data.street || null,
     age: data.age ?? null,
-    gender: data.gender ?? null,
     course_start_date: data.course_start_date,
     days_system: data.days_system,
     session_price: data.session_price,
@@ -221,6 +219,21 @@ async function renumberCourses(supabase: any, patientId: string) {
       .eq("patient_id", patientId)
       .eq("course_number", 1000 + i);
   }
+}
+
+// إنهاء كورس مبكرًا: إلغاء الجلسات اللي لسه ما اتعملتش (لم تتم/مؤجلة)
+// فيتحسب الحساب على الجلسات اللي اتعملت فعلًا فقط.
+export async function endCourse(patientId: string, courseNumber: number) {
+  const supabase = createServerSupabase();
+  await supabase
+    .from("sessions")
+    .update({ status: "cancelled" })
+    .eq("patient_id", patientId)
+    .eq("course_number", courseNumber)
+    .in("status", ["pending", "postponed"]);
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  revalidatePath("/calc");
 }
 
 // حذف كورس كامل (كل جلساته) ثم إعادة الترقيم

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Session, SESSION_STATUS_LABELS, SessionStatus } from "@/lib/types";
 import { updateSession, bulkUpdateStatus } from "@/app/actions/sessions";
-import { deleteCourse, rescheduleCourse } from "@/app/actions/patients";
+import { deleteCourse, rescheduleCourse, endCourse } from "@/app/actions/patients";
 import { formatArabicDate, formatTime, todayISO } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronDown, CheckSquare, Square, X, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronDown, CheckSquare, Square, X, Pencil, Trash2, Flag } from "lucide-react";
 
 const STATUSES: SessionStatus[] = ["done", "pending", "postponed", "cancelled"];
 
@@ -37,15 +37,28 @@ export function SessionsTable({
   const courses = Array.from(new Set(sessions.map((s) => s.course_number))).sort((a, b) => a - b);
   const maxCourse = courses.length ? Math.max(...courses) : 1;
 
+  // إجمالي تراكمي بالجلسات الفعلية (مش الملغية/المؤجلة) لكل كورس
+  const cumulativeActive = new Map<number, number>();
+  {
+    let running = 0;
+    for (const c of courses) {
+      running += sessions.filter(
+        (s) => s.course_number === c && s.status !== "cancelled" && s.status !== "postponed"
+      ).length;
+      cumulativeActive.set(c, running);
+    }
+  }
+
   // الكورس الحالي مفتوح افتراضيًا، الباقي مطوي
   const [openCourses, setOpenCourses] = useState<Set<number>>(new Set([maxCourse]));
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<SessionStatus>("done");
 
-  // تعديل/حذف كورس
+  // تعديل/حذف/إنهاء كورس
   const [editCourse, setEditCourse] = useState<number | null>(null);
   const [delCourse, setDelCourse] = useState<number | null>(null);
+  const [endC, setEndC] = useState<number | null>(null);
   const [reDate, setReDate] = useState(todayISO());
   const [reTime, setReTime] = useState("");
 
@@ -63,6 +76,15 @@ export function SessionsTable({
     startTransition(async () => {
       await deleteCourse(patientId, delCourse);
       setDelCourse(null);
+      router.refresh();
+    });
+  }
+
+  function doEndCourse() {
+    if (endC == null) return;
+    startTransition(async () => {
+      await endCourse(patientId, endC);
+      setEndC(null);
       router.refresh();
     });
   }
@@ -136,11 +158,15 @@ export function SessionsTable({
         {courses.map((courseNum) => {
           const courseSessions = sessions.filter((s) => s.course_number === courseNum);
           const done = courseSessions.filter((s) => s.status === "done").length;
+          const activeInCourse = courseSessions.filter(
+            (s) => s.status !== "cancelled" && s.status !== "postponed"
+          ).length;
+          const hasPending = courseSessions.some((s) => s.status === "pending");
           const finished = courseSessions.every(
             (s) => s.status === "done" || s.status === "cancelled"
           );
           const isOpen = openCourses.has(courseNum);
-          const cumulative = 12 * courseNum;
+          const cumulative = cumulativeActive.get(courseNum) ?? activeInCourse;
           return (
             <div key={courseNum} className="overflow-hidden rounded-xl border bg-card">
               <div className="flex items-center gap-1 p-3">
@@ -153,7 +179,7 @@ export function SessionsTable({
                           finished ? "text-xs font-medium text-success" : "text-xs font-medium text-primary"
                         }
                       >
-                        {finished ? "انتهى" : `${done}/12 تمت`}
+                        {finished ? "انتهى" : `${done}/${activeInCourse} تمت`}
                       </span>
                     </div>
                     <span className="text-[11px] text-muted-foreground">إجمالي {cumulative} جلسة</span>
@@ -219,6 +245,19 @@ export function SessionsTable({
                   })}
                 </ul>
               )}
+
+              {isOpen && hasPending && (
+                <div className="border-t p-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-warning"
+                    onClick={() => setEndC(courseNum)}
+                  >
+                    <Flag /> إنهاء الكورس (إلغاء الجلسات المتبقية)
+                  </Button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -263,6 +302,27 @@ export function SessionsTable({
             </div>
             <Button className="w-full" disabled={isPending || !reDate} onClick={doReschedule}>
               {isPending ? "جارٍ الحفظ..." : "حفظ المواعيد"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* إنهاء كورس */}
+      <Dialog open={endC != null} onOpenChange={(o) => !o && setEndC(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>إنهاء كورس رقم {endC}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            هيتم إلغاء كل الجلسات اللي لسه ما اتعملتش في الكورس ده (المريض خلّص بدري أو ربنا شفاه)،
+            والحساب المالي هيتحسب على الجلسات اللي اتعملت فعلًا بس. الجلسات اللي تمت هتفضل زي ما هي.
+          </p>
+          <div className="flex gap-2">
+            <Button className="flex-1" disabled={isPending} onClick={doEndCourse}>
+              {isPending ? "جارٍ الإنهاء..." : "نعم، أنهِ الكورس"}
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setEndC(null)}>
+              إلغاء
             </Button>
           </div>
         </DialogContent>

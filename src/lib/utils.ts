@@ -28,13 +28,7 @@ export function toISODate(d: Date): string {
 }
 
 export function todayISO(): string {
-  const cairoDate = new Date(
-    new Date().toLocaleString("en-US", {
-      timeZone: "Africa/Cairo",
-    })
-  );
-
-  return toISODate(cairoDate);
+  return toISODate(new Date());
 }
 
 // توليد تواريخ 12 جلسة بدءًا من تاريخ البداية حسب نظام الأيام
@@ -91,7 +85,7 @@ export function formatTime(time: string | null): string {
 }
 
 export function formatMoney(n: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+  return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(
     Math.round(n)
   );
 }
@@ -149,14 +143,18 @@ export function calcFinance(
   payments: Payment[]
 ): FinanceSummary {
   const coursesCount = getCoursesCount(sessions);
-  const billableSessions = TOTAL_SESSIONS * coursesCount;
-  // الخصم يُطبّق على كل كورس على حدة
+  // الجلسات المحاسَب عليها = الفعلية فقط (لا الملغية ولا المؤجلة)
+  // فلو اتعمل "إنهاء كورس" تتلغي الباقية ويتحسب على اللي اتعمل بس.
+  const billableSessions = sessions.filter(
+    (s) => s.status !== "cancelled" && s.status !== "postponed"
+  ).length;
+  // الخصم يُطبّق على كل كورس على حدة (ومحدود بإجمالي قيمة الجلسات)
   const totalBeforeDiscount = patient.session_price * billableSessions;
-  const discountApplied = patient.discount * coursesCount;
+  const discountApplied = Math.min(patient.discount * coursesCount, totalBeforeDiscount);
   const total = totalBeforeDiscount - discountApplied;
   const paid = payments.reduce((s, p) => s + Number(p.amount), 0);
   const remaining = Math.max(total - paid, 0);
-  const perSession = total / billableSessions;
+  const perSession = billableSessions > 0 ? total / billableSessions : 0;
   const doneCount = sessions.filter((s) => s.status === "done").length;
 
   let dueNow = 0;
