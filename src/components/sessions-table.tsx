@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Session, SESSION_STATUS_LABELS, SessionStatus } from "@/lib/types";
-import { updateSession, bulkUpdateStatus } from "@/app/actions/sessions";
+import { updateSession, bulkUpdateStatus, deleteSession } from "@/app/actions/sessions";
 import { deleteCourse, rescheduleCourse, endCourse } from "@/app/actions/patients";
 import { formatArabicDate, formatTime, todayISO } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
@@ -58,6 +58,7 @@ export function SessionsTable({
   // تعديل/حذف/إنهاء كورس
   const [editCourse, setEditCourse] = useState<number | null>(null);
   const [delCourse, setDelCourse] = useState<number | null>(null);
+  const [delSession, setDelSession] = useState<Session | null>(null);
   const [endC, setEndC] = useState<number | null>(null);
   const [reDate, setReDate] = useState(todayISO());
   const [reTime, setReTime] = useState("");
@@ -77,6 +78,19 @@ export function SessionsTable({
       await deleteCourse(patientId, delCourse);
       setDelCourse(null);
       router.refresh();
+    });
+  }
+
+  function doDeleteSession() {
+    if (!delSession) return;
+    startTransition(async () => {
+      const res = await deleteSession(patientId, delSession.id);
+      if (res.ok) {
+        setDelSession(null);
+        router.refresh();
+      } else {
+        setError(res.error ?? "حدث خطأ");
+      }
     });
   }
 
@@ -377,8 +391,39 @@ export function SessionsTable({
               <Button type="submit" size="lg" className="w-full" disabled={isPending}>
                 {isPending ? "جارٍ الحفظ..." : "حفظ"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full text-destructive"
+                disabled={isPending}
+                onClick={() => { setDelSession(active); setActive(null); }}
+              >
+                <Trash2 /> حذف الجلسة
+              </Button>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* حذف جلسة */}
+      <Dialog open={!!delSession} onOpenChange={(o) => !o && setDelSession(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>حذف الجلسة رقم {delSession?.session_number}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            هيتم حذف الجلسة دي نهائيًا من الكورس. لا يمكن التراجع.
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <Button variant="destructive" className="flex-1" disabled={isPending} onClick={doDeleteSession}>
+              {isPending ? "جارٍ الحذف..." : "نعم، احذف الجلسة"}
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setDelSession(null)}>
+              إلغاء
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

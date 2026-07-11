@@ -112,6 +112,21 @@ async function removeLastMakeup(supabase: any, patientId: string, courseNumber: 
   }
 }
 
+// حذف جلسة واحدة نهائيًا (مثلاً لو اتضافت بالغلط)
+export async function deleteSession(
+  patientId: string,
+  sessionId: string
+): Promise<ActionResult> {
+  const supabase = createServerSupabase();
+  const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/patients/${patientId}`);
+  revalidatePath("/");
+  revalidatePath("/calc");
+  return { ok: true };
+}
+
 // تغيير حالة عدة جلسات دفعة واحدة
 export async function bulkUpdateStatus(
   patientId: string,
